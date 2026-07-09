@@ -1164,6 +1164,33 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </DetailSection>
         )}
 
+        {/* Request body (admin only) */}
+        {props.isAdmin && other?.admin_info?.request_body && (
+          <DetailSection label={t('Request Body')}>
+            <div className='bg-background/60 relative min-w-0 overflow-hidden rounded border p-2'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='absolute top-1.5 right-1.5 h-5 w-5 p-0'
+                onClick={() =>
+                  copyToClipboard(other.admin_info!.request_body!)
+                }
+                title={t('Copy to clipboard')}
+                aria-label={t('Copy to clipboard')}
+              >
+                {copiedText === other.admin_info.request_body ? (
+                  <Check className='size-3 text-green-600' />
+                ) : (
+                  <Copy className='size-3' />
+                )}
+              </Button>
+              <pre className='max-h-64 overflow-y-auto pr-6 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all'>
+                {other.admin_info.request_body}
+              </pre>
+            </div>
+          </DetailSection>
+        )}
+
         {/* Content */}
         {details && (
           <div className='space-y-1.5'>

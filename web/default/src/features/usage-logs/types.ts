@@ -120,6 +120,9 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
+    // Original client request body, captured when LogRequestBodyEnabled is on.
+    // Admin-only (nested under admin_info). Capped to a few KB.
+    request_body?: string
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.

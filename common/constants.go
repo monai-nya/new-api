@@ -116,6 +116,17 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
+// LogRequestBodyEnabled controls whether the original client request body is
+// captured into usage log entries (under other.admin_info.request_body, which
+// is admin-only — formatUserLogs strips admin_info for non-admin viewers).
+// Off by default: request bodies can be large and may contain private
+// conversation content.
+var LogRequestBodyEnabled bool
+
+// MaxLogRequestBodyBytes caps the request-body snippet stored in usage logs;
+// larger bodies are skipped to avoid materializing huge payloads.
+const MaxLogRequestBodyBytes = 4096
+
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
 

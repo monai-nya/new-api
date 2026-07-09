@@ -1,0 +1,77 @@
+name: Build
+
+# Manual one-off build that produces runnable binaries (with the frontend
+# embedded) as downloadable artifacts. Unlike release.yml it does not depend on
+# a git tag, so it works on a repo with no tags yet. Use it to verify the
+# current commit compiles and to grab a binary to run locally.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            runner: windows-latest
+            artifact_name: new-api-windows
+            output: new-api-windows.exe
+          - os: linux
+            runner: ubuntu-latest
+            artifact_name: new-api-linux
+            output: new-api-linux
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build Frontend (default)
+        env:
+          CI: ""
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          cd default
+          DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=ci-build bun run build
+          cd ../..
+
+      - name: Build Frontend (classic)
+        env:
+          CI: ""
+        run: |
+          cd web
+          bun install --filter ./classic --frozen-lockfile
+          cd classic
+          VITE_REACT_APP_VERSION=ci-build bun run build
+          cd ../..
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.25.1'
+
+      - name: Build Backend
+        run: |
+          go mod download
+          go build -ldflags "-s -w" -o ${{ matrix.output }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.output }}
+          if-no-files-found: error

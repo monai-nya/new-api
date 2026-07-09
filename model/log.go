@@ -98,6 +98,38 @@ func ensureLogRequestId(log *Log) {
 	}
 }
 
+// attachRequestBodyToOther captures the original client request body into the
+// log's other.admin_info.request_body when LogRequestBodyEnabled is on. It is
+// admin-only (formatUserLogs strips admin_info for non-admin viewers), which
+// keeps potentially private request content out of the user-facing log view.
+// Oversized bodies are skipped rather than truncated, so disk-backed storage is
+// never materialized in full.
+func attachRequestBodyToOther(c *gin.Context, other *map[string]interface{}) {
+	if !common.LogRequestBodyEnabled || c == nil || other == nil {
+		return
+	}
+	storage, err := common.GetBodyStorage(c)
+	if err != nil || storage == nil {
+		return
+	}
+	if storage.Size() > int64(common.MaxLogRequestBodyBytes) {
+		return
+	}
+	body, err := storage.Bytes()
+	if err != nil || len(body) == 0 {
+		return
+	}
+	if *other == nil {
+		*other = map[string]interface{}{}
+	}
+	adminInfo, ok := (*other)["admin_info"].(map[string]interface{})
+	if !ok || adminInfo == nil {
+		adminInfo = map[string]interface{}{}
+		(*other)["admin_info"] = adminInfo
+	}
+	adminInfo["request_body"] = string(body)
+}
+
 func createLog(log *Log) error {
 	ensureLogRequestId(log)
 	return LOG_DB.Create(log).Error
@@ -285,6 +317,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
+	attachRequestBodyToOther(c, &other)
 	otherStr := common.MapToJsonStr(other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -349,6 +382,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
+	attachRequestBodyToOther(c, &params.Other)
 	otherStr := common.MapToJsonStr(params.Other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -590,7 +624,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	if group != "" {
 		tx = tx.Where("logs."+logGroupCol+" = ?", group)
 	}
-	err = tx.Model(&Log{}).Limit(logSearchCountLimit).Count(&total).Error
+	// GORM v2 Count() strips LIMIT/OFFSET, so a bare Limit on tx never capped
+	// the count. Wrap the filtered query in a subquery so COUNT(*) is bounded
+	// to logSearchCountLimit rows, protecting large-table COUNT performance.
+	countSubQuery := tx.Session(&gorm.Session{}).Model(&Log{}).Limit(logSearchCountLimit)
+	err = LOG_DB.Table("(?) AS limited_user_logs", countSubQuery).Count(&total).Error
 	if err != nil {
 		common.SysError("failed to count user logs: " + err.Error())
 		return nil, 0, errors.New("查询日志失败")
@@ -652,7 +690,11 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 		rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
 	}
 
-	tx = tx.Where("type = ?", LogTypeConsume)
+	// quota honors the requested log type (0 = all types); rpm/tpm always
+	// reflect consume calls because only consume logs carry token counts.
+	if logType != LogTypeUnknown {
+		tx = tx.Where("type = ?", logType)
+	}
 	rpmTpmQuery = rpmTpmQuery.Where("type = ?", LogTypeConsume)
 
 	// 只统计最近60秒的rpm和tpm
