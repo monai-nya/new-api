@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "Recommended to keep this high to avoid upstream throttling.",
     "Record IP Address": "Record IP Address",
     "Record quota usage": "Record quota usage",
+    "Record request body": "Record request body",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.",
+    "Record response body": "Record response body",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.",
+    "Request Body": "Request Body",
+    "Response Body": "Response Body",
+    "Model Output": "Model Output",
+    "User Input": "User Input",
     "Recursion Strategy": "Recursion Strategy",
     "Recursive": "Recursive",
     "Redeem": "Redeem",
@@ -5103,6 +5111,12 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Request log size limit (KB)": "Request log size limit (KB)",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.",
+    "Response log size limit (KB)": "Response log size limit (KB)",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded."
   }
 }

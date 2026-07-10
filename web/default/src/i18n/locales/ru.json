@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "Рекомендуется поддерживать это значение высоким, чтобы избежать регулирования со стороны вышестоящего поставщика.",
     "Record IP Address": "Записывать IP-адрес",
     "Record quota usage": "Записывать использование квоты",
+    "Record request body": "Записывать тело запроса",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "Записывает исходное тело клиентского запроса в каждую запись журнала использования (только для администраторов). Полезно для отладки, но увеличивает размер журнала и может сохранять конфиденциальные данные.",
+    "Record response body": "Записывать тело ответа",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "Записывает тело ответа модели в каждую запись журнала использования (только для администраторов). Поддерживаются потоковые и обычные ответы. Полезно для отладки, но увеличивает размер журнала.",
+    "Request Body": "Тело запроса",
+    "Response Body": "Тело ответа",
+    "Model Output": "Вывод модели",
+    "User Input": "Ввод пользователя",
     "Recursion Strategy": "Стратегия рекурсии",
     "Recursive": "Рекурсивно",
     "Redeem": "Обменять квоту",
@@ -5103,6 +5111,12 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Request log size limit (KB)": "Ограничение размера журнала запросов (КБ)",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Запросы больше этого ограничения не записываются. Допустимый диапазон: от 1 до 10240 КБ.",
+    "Response log size limit (KB)": "Ограничение размера журнала ответов (КБ)",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Ответы больше этого ограничения не записываются. Допустимый диапазон: от 1 до 10240 КБ.",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "В каждой записи журнала использования сохраняется только текст, созданный моделью (только для администраторов). Вызовы инструментов, метаданные рассуждений, данные об использовании и другие поля ответа исключаются.",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "В каждой записи журнала использования сохраняется только текст, введённый пользователем (только для администраторов). Системные сообщения, сообщения ассистента, вызовы инструментов, файлы и другие поля запроса исключаются."
   }
 }

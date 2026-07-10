@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,10 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(common.AutomaticDisableChannelEnabled)
 	common.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(common.AutomaticEnableChannelEnabled)
 	common.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(common.LogConsumeEnabled)
+	common.OptionMap["LogRequestBodyEnabled"] = strconv.FormatBool(common.LogRequestBodyEnabled)
+	common.OptionMap["LogRequestBodyMaxKB"] = strconv.Itoa(common.LogRequestBodyMaxKB)
+	common.OptionMap["LogResponseBodyEnabled"] = strconv.FormatBool(common.LogResponseBodyEnabled)
+	common.OptionMap["LogResponseBodyMaxKB"] = strconv.Itoa(common.LogResponseBodyMaxKB)
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
 	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
@@ -205,6 +210,9 @@ func SyncOptions(frequency int) {
 }
 
 func UpdateOption(key string, value string) error {
+	if err := validateOptionValue(key, value); err != nil {
+		return err
+	}
 	// Save to database first
 	option := Option{
 		Key: key,
@@ -228,6 +236,11 @@ func UpdateOption(key string, value string) error {
 func UpdateOptionsBulk(values map[string]string) error {
 	if len(values) == 0 {
 		return nil
+	}
+	for key, value := range values {
+		if err := validateOptionValue(key, value); err != nil {
+			return err
+		}
 	}
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		for k, v := range values {
@@ -254,6 +267,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	if err = validateOptionValue(key, value); err != nil {
+		return err
+	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
 	common.OptionMap[key] = value
@@ -371,6 +387,10 @@ func updateOptionMap(key string, value string) (err error) {
 		}
 	}
 	switch key {
+	case "LogRequestBodyMaxKB":
+		common.LogRequestBodyMaxKB, _ = strconv.Atoi(value)
+	case "LogResponseBodyMaxKB":
+		common.LogResponseBodyMaxKB, _ = strconv.Atoi(value)
 	case "EmailDomainWhitelist":
 		common.EmailDomainWhitelist = strings.Split(value, ",")
 	case "SMTPServer":
@@ -578,6 +598,17 @@ func updateOptionMap(key string, value string) (err error) {
 		// No additional in-memory variable to update.
 	}
 	return err
+}
+
+func validateOptionValue(key string, value string) error {
+	switch key {
+	case "LogRequestBodyMaxKB", "LogResponseBodyMaxKB":
+		intValue, err := strconv.Atoi(value)
+		if err != nil || !common.IsValidLogBodySizeKB(intValue) {
+			return fmt.Errorf("%s must be between 1 and %d KB", key, common.MaxLogBodySizeKB)
+		}
+	}
+	return nil
 }
 
 // handleConfigUpdate 处理分层配置更新，返回是否已处理

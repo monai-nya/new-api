@@ -4,108 +4,354 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 )
 
-// messageContentPart is one entry of an OpenAI multimodal content array.
-type messageContentPart struct {
+type logContentPart struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
-// extractContentText pulls plain text out of an OpenAI message "content" field,
-// which may be a plain string or an array of typed parts (text/image/etc.).
-// Non-text parts (e.g. images) are skipped. json.RawMessage is referenced as a
-// type only; parsing goes through common.Unmarshal per project convention.
-func extractContentText(raw json.RawMessage) string {
+func joinLogText(parts []string) string {
+	filtered := parts[:0]
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			filtered = append(filtered, part)
+		}
+	}
+	return strings.Join(filtered, "\n")
+}
+
+func extractContentText(raw json.RawMessage, response bool) string {
 	if len(raw) == 0 {
 		return ""
 	}
-	var asString string
-	if err := common.Unmarshal(raw, &asString); err == nil {
-		return asString
+	var text string
+	if err := common.Unmarshal(raw, &text); err == nil {
+		return text
 	}
-	var parts []messageContentPart
-	if err := common.Unmarshal(raw, &parts); err == nil {
-		var sb strings.Builder
-		for _, p := range parts {
-			if p.Type == "text" && p.Text != "" {
-				sb.WriteString(p.Text)
-			}
+
+	var parts []logContentPart
+	if err := common.Unmarshal(raw, &parts); err != nil {
+		var part logContentPart
+		if err := common.Unmarshal(raw, &part); err != nil {
+			return ""
 		}
-		return sb.String()
+		parts = []logContentPart{part}
+	}
+
+	texts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		kind := strings.ToLower(part.Type)
+		allowed := kind == "" || kind == "text"
+		if response {
+			allowed = allowed || kind == "output_text"
+		} else {
+			allowed = allowed || kind == "input_text"
+		}
+		if allowed && part.Text != "" {
+			texts = append(texts, part.Text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractMessageUserText(raw json.RawMessage) string {
+	var messages []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := common.Unmarshal(raw, &messages); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if strings.ToLower(message.Role) != "user" {
+			continue
+		}
+		if text := extractContentText(message.Content, false); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractGeminiUserText(raw json.RawMessage) string {
+	var contents []struct {
+		Role  string          `json:"role"`
+		Parts json.RawMessage `json:"parts"`
+	}
+	if err := common.Unmarshal(raw, &contents); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(contents))
+	for _, content := range contents {
+		role := strings.ToLower(content.Role)
+		if role != "" && role != "user" {
+			continue
+		}
+		if text := extractContentText(content.Parts, false); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractSimpleUserText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var text string
+	if err := common.Unmarshal(raw, &text); err == nil {
+		return text
+	}
+	var texts []string
+	if err := common.Unmarshal(raw, &texts); err == nil {
+		return joinLogText(texts)
 	}
 	return ""
 }
 
-// extractRequestText parses the client request body and renders the conversation
-// as readable plain text, one "[role] text" line per message (covers OpenAI chat
-// and Claude message formats). Falls back to the raw body when it is not a
-// recognizable chat request.
-func extractRequestText(body []byte) string {
-	var req struct {
-		Messages []struct {
-			Role    string          `json:"role"`
-			Content json.RawMessage `json:"content"`
-		} `json:"messages"`
+func extractResponsesUserText(raw json.RawMessage) string {
+	if text := extractSimpleUserText(raw); text != "" {
+		return text
 	}
-	if err := common.Unmarshal(body, &req); err != nil {
-		return string(body)
+
+	var items []json.RawMessage
+	if err := common.Unmarshal(raw, &items); err != nil {
+		items = []json.RawMessage{raw}
 	}
-	var sb strings.Builder
-	for _, m := range req.Messages {
-		text := extractContentText(m.Content)
-		if text == "" {
+	texts := make([]string, 0, len(items))
+	for _, itemRaw := range items {
+		if text := extractSimpleUserText(itemRaw); text != "" {
+			texts = append(texts, text)
 			continue
 		}
-		role := m.Role
-		if role == "" {
-			role = "user"
+		var item struct {
+			Type    string          `json:"type"`
+			Role    string          `json:"role"`
+			Text    string          `json:"text"`
+			Content json.RawMessage `json:"content"`
 		}
-		fmt.Fprintf(&sb, "[%s] %s\n", role, text)
+		if err := common.Unmarshal(itemRaw, &item); err != nil {
+			continue
+		}
+		kind := strings.ToLower(item.Type)
+		if kind == "input_text" && item.Text != "" {
+			texts = append(texts, item.Text)
+			continue
+		}
+		if strings.ToLower(item.Role) != "user" {
+			continue
+		}
+		if text := extractContentText(item.Content, false); text != "" {
+			texts = append(texts, text)
+		}
 	}
-	if sb.Len() == 0 {
-		return string(body)
-	}
-	return strings.TrimRight(sb.String(), "\n")
+	return joinLogText(texts)
 }
 
-// extractResponseText extracts the model's text output from the response body.
-// Handles OpenAI streamed SSE ("data: {…}") and non-streamed JSON. Falls back to
-// the raw body when the format is unrecognized.
-func extractResponseText(data []byte) string {
-	if bytes.Contains(data, []byte("data:")) {
-		if s := extractSSEContent(data); s != "" {
-			return s
-		}
+// extractRequestText returns user-entered text only. System/developer and
+// assistant messages, tool calls/results, files, images, and unknown payload
+// fields are deliberately excluded. Unknown request formats are not logged.
+func extractRequestText(body []byte) string {
+	var request struct {
+		Messages json.RawMessage   `json:"messages"`
+		Contents json.RawMessage   `json:"contents"`
+		Input    json.RawMessage   `json:"input"`
+		Prompt   json.RawMessage   `json:"prompt"`
+		Requests []json.RawMessage `json:"requests"`
 	}
-	var resp struct {
-		Choices []struct {
-			Message struct {
-				Content json.RawMessage `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
+	if err := common.Unmarshal(body, &request); err != nil {
+		return ""
 	}
-	if err := common.Unmarshal(data, &resp); err == nil && len(resp.Choices) > 0 {
-		var sb strings.Builder
-		for _, c := range resp.Choices {
-			sb.WriteString(extractContentText(c.Message.Content))
-		}
-		if sb.Len() > 0 {
-			return sb.String()
-		}
+	if text := extractMessageUserText(request.Messages); text != "" {
+		return text
 	}
-	return string(data)
+	if text := extractGeminiUserText(request.Contents); text != "" {
+		return text
+	}
+	if text := extractResponsesUserText(request.Input); text != "" {
+		return text
+	}
+	if text := extractSimpleUserText(request.Prompt); text != "" {
+		return text
+	}
+	if len(request.Requests) > 0 {
+		texts := make([]string, 0, len(request.Requests))
+		for _, batchRequest := range request.Requests {
+			if text := extractRequestText(batchRequest); text != "" {
+				texts = append(texts, text)
+			}
+		}
+		return joinLogText(texts)
+	}
+	return ""
 }
 
-// extractSSEContent concatenates the content deltas from an OpenAI SSE stream.
+func extractChoicesText(raw json.RawMessage) string {
+	var choices []struct {
+		Text    string `json:"text"`
+		Message struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"message"`
+		Delta struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"delta"`
+	}
+	if err := common.Unmarshal(raw, &choices); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(choices))
+	for _, choice := range choices {
+		if choice.Text != "" {
+			texts = append(texts, choice.Text)
+		}
+		if text := extractContentText(choice.Message.Content, true); text != "" {
+			texts = append(texts, text)
+		}
+		if text := extractContentText(choice.Delta.Content, true); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractResponsesOutputText(raw json.RawMessage) string {
+	var outputs []struct {
+		Type    string          `json:"type"`
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := common.Unmarshal(raw, &outputs); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(outputs))
+	for _, output := range outputs {
+		kind := strings.ToLower(output.Type)
+		role := strings.ToLower(output.Role)
+		if role != "assistant" && !(kind == "message" && role == "") {
+			continue
+		}
+		if text := extractContentText(output.Content, true); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractGeminiResponseText(raw json.RawMessage) string {
+	var candidates []struct {
+		Content struct {
+			Parts json.RawMessage `json:"parts"`
+		} `json:"content"`
+	}
+	if err := common.Unmarshal(raw, &candidates); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if text := extractContentText(candidate.Content.Parts, true); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractClaudeResponseText(raw json.RawMessage) string {
+	var parts []logContentPart
+	if err := common.Unmarshal(raw, &parts); err != nil {
+		return ""
+	}
+	texts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.ToLower(part.Type) == "text" && part.Text != "" {
+			texts = append(texts, part.Text)
+		}
+	}
+	return joinLogText(texts)
+}
+
+func extractJSONResponseText(data []byte) string {
+	var response struct {
+		Choices    json.RawMessage   `json:"choices"`
+		Output     json.RawMessage   `json:"output"`
+		Content    json.RawMessage   `json:"content"`
+		Candidates json.RawMessage   `json:"candidates"`
+		Responses  []json.RawMessage `json:"responses"`
+	}
+	if err := common.Unmarshal(data, &response); err != nil {
+		return ""
+	}
+	if text := extractChoicesText(response.Choices); text != "" {
+		return text
+	}
+	if text := extractResponsesOutputText(response.Output); text != "" {
+		return text
+	}
+	if text := extractClaudeResponseText(response.Content); text != "" {
+		return text
+	}
+	if text := extractGeminiResponseText(response.Candidates); text != "" {
+		return text
+	}
+	if len(response.Responses) > 0 {
+		texts := make([]string, 0, len(response.Responses))
+		for _, batchResponse := range response.Responses {
+			if text := extractJSONResponseText(batchResponse); text != "" {
+				texts = append(texts, text)
+			}
+		}
+		return joinLogText(texts)
+	}
+	return ""
+}
+
+func extractSSEPayloadText(payload []byte) string {
+	var event struct {
+		Type  string          `json:"type"`
+		Delta json.RawMessage `json:"delta"`
+		ContentBlock struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content_block"`
+		Choices    json.RawMessage `json:"choices"`
+		Candidates json.RawMessage `json:"candidates"`
+	}
+	if err := common.Unmarshal(payload, &event); err != nil {
+		return ""
+	}
+	switch event.Type {
+	case "response.output_text.delta":
+		var delta string
+		if err := common.Unmarshal(event.Delta, &delta); err == nil {
+			return delta
+		}
+	case "content_block_delta":
+		var delta struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}
+		if err := common.Unmarshal(event.Delta, &delta); err == nil && delta.Type == "text_delta" {
+			return delta.Text
+		}
+	case "content_block_start":
+		if event.ContentBlock.Type == "text" {
+			return event.ContentBlock.Text
+		}
+	}
+	if text := extractChoicesText(event.Choices); text != "" {
+		return text
+	}
+	return extractGeminiResponseText(event.Candidates)
+}
+
 func extractSSEContent(data []byte) string {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
-	var sb strings.Builder
+	scanner.Buffer(make([]byte, 0, 64*1024), common.MaxLogBodySizeKB<<10)
+	var text strings.Builder
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(line, "data:") {
@@ -115,26 +361,18 @@ func extractSSEContent(data []byte) string {
 		if payload == "" || payload == "[DONE]" {
 			continue
 		}
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-				Message struct {
-					Content json.RawMessage `json:"content"`
-				} `json:"message"`
-			} `json:"choices"`
-		}
-		if err := common.Unmarshal([]byte(payload), &chunk); err != nil {
-			continue
-		}
-		for _, c := range chunk.Choices {
-			if c.Delta.Content != "" {
-				sb.WriteString(c.Delta.Content)
-			} else if len(c.Message.Content) > 0 {
-				sb.WriteString(extractContentText(c.Message.Content))
-			}
+		text.WriteString(extractSSEPayloadText([]byte(payload)))
+	}
+	return text.String()
+}
+
+// extractResponseText returns model-generated text only. Tool calls, reasoning,
+// usage, metadata, and unknown response formats are not logged.
+func extractResponseText(data []byte) string {
+	if bytes.Contains(data, []byte("data:")) {
+		if text := extractSSEContent(data); text != "" {
+			return text
 		}
 	}
-	return sb.String()
+	return extractJSONResponseText(data)
 }

@@ -5111,6 +5111,12 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Request log size limit (KB)": "请求日志大小限制（KB）",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "超过此限制的请求不会被记录。允许范围为 1 到 10240 KB。",
+    "Response log size limit (KB)": "响应日志大小限制（KB）",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "超过此限制的响应不会被记录。允许范围为 1 到 10240 KB。",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "每条使用日志仅保存模型生成的文本（仅管理员可见）。工具调用、推理元数据、用量数据及其他响应字段均不会保存。",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "每条使用日志仅保存用户输入的文本（仅管理员可见）。系统消息、助手消息、工具调用、文件及其他请求字段均不会保存。"
   }
 }

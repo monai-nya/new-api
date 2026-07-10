@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "建議保持此值較高，以避免上游限流。",
     "Record IP Address": "記錄 IP 地址",
     "Record quota usage": "記錄配額使用量",
+    "Record request body": "記錄請求本文",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "將原始用戶端請求本文記錄到每筆使用日誌中（僅管理員可見）。便於偵錯，但會增加日誌大小，且可能儲存隱私內容。",
+    "Record response body": "記錄回應本文",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "將模型回應本文記錄到每筆使用日誌中（僅管理員可見）。支援串流與非串流回應。便於偵錯，但會增加日誌大小。",
+    "Request Body": "請求本文",
+    "Response Body": "回應本文",
+    "Model Output": "模型輸出",
+    "User Input": "使用者輸入",
     "Recursion Strategy": "遞迴策略",
     "Recursive": "遞迴",
     "Redeem": "兌換額度",
@@ -5103,6 +5111,12 @@
     "Zero retention": "零數據保留",
     "Zhipu": "智譜",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "Request log size limit (KB)": "請求日誌大小限制（KB）",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "超過此限制的請求不會被記錄。允許範圍為 1 到 10240 KB。",
+    "Response log size limit (KB)": "回應日誌大小限制（KB）",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "超過此限制的回應不會被記錄。允許範圍為 1 到 10240 KB。",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "每筆使用日誌僅儲存模型產生的文字（僅管理員可見）。工具呼叫、推理中繼資料、用量資料及其他回應欄位均不會儲存。",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "每筆使用日誌僅儲存使用者輸入的文字（僅管理員可見）。系統訊息、助理訊息、工具呼叫、檔案及其他請求欄位均不會儲存。"
   }
 }

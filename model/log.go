@@ -1,7 +1,6 @@
 package model
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -99,14 +98,14 @@ func ensureLogRequestId(log *Log) {
 	}
 }
 
-// attachBodiesToOther stores the user input text (other.admin_info.request_body)
-// and/or the model output text (other.admin_info.response_body) into the log
-// when the corresponding switches are on. The request body is parsed into a
-// readable "[role] text" conversation, and the response body (streamed SSE or
-// JSON, captured by the CaptureResponseBody middleware via a tee on c.Writer) is
-// parsed into the model's text output. Both are admin-only (formatUserLogs
-// strips admin_info for non-admin viewers). No size cap, so large payloads will
-// bloat the log table.
+func isLogBodyWithinLimit(size int64, maxKB int) bool {
+	return common.IsValidLogBodySizeKB(maxKB) && size <= int64(maxKB)<<10
+}
+
+// attachBodiesToOther stores only user-entered text and model-generated text.
+// Original payloads larger than their independently configured limits are not
+// recorded. Both fields remain admin-only because formatUserLogs strips the
+// complete admin_info object for non-admin viewers.
 func attachBodiesToOther(c *gin.Context, other *map[string]interface{}) {
 	if c == nil || other == nil {
 		return
@@ -116,22 +115,27 @@ func attachBodiesToOther(c *gin.Context, other *map[string]interface{}) {
 	}
 	if common.LogRequestBodyEnabled {
 		if storage, err := common.GetBodyStorage(c); err == nil && storage != nil {
-			if body, bErr := storage.Bytes(); bErr == nil && len(body) > 0 {
-				setLogAdminInfo(other, "request_body", extractRequestText(body))
+			if isLogBodyWithinLimit(storage.Size(), common.LogRequestBodyMaxKB) {
+				body, bErr := storage.Bytes()
+				if bErr == nil && len(body) > 0 {
+					setLogAdminInfo(other, "request_body", extractRequestText(body))
+				}
 			}
 		}
 	}
 	if common.LogResponseBodyEnabled {
-		if v, ok := c.Get(common.KeyCapturedResponseBody); ok && v != nil {
-			if buf, ok := v.(*bytes.Buffer); ok && buf.Len() > 0 {
-				setLogAdminInfo(other, "response_body", extractResponseText(buf.Bytes()))
-			}
+		body, exceeded := common.GetCapturedResponseBody(c)
+		if !exceeded && len(body) > 0 && isLogBodyWithinLimit(int64(len(body)), common.LogResponseBodyMaxKB) {
+			setLogAdminInfo(other, "response_body", extractResponseText(body))
 		}
 	}
 }
 
 // setLogAdminInfo ensures other.admin_info exists and stores value under key.
 func setLogAdminInfo(other *map[string]interface{}, key string, value string) {
+	if value == "" {
+		return
+	}
 	if *other == nil {
 		*other = map[string]interface{}{}
 	}

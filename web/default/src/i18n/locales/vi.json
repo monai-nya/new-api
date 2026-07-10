@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "Khuyến nghị giữ mức này cao để tránh điều tiết từ phía thượng nguồn.",
     "Record IP Address": "Ghi lại địa chỉ IP",
     "Record quota usage": "Ghi lại mức sử dụng hạn mức",
+    "Record request body": "Ghi lại nội dung yêu cầu",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "Ghi nội dung yêu cầu gốc của máy khách vào từng nhật ký sử dụng (chỉ quản trị viên). Hữu ích khi gỡ lỗi nhưng làm tăng kích thước nhật ký và có thể lưu nội dung riêng tư.",
+    "Record response body": "Ghi lại nội dung phản hồi",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "Ghi nội dung phản hồi của mô hình vào từng nhật ký sử dụng (chỉ quản trị viên). Hỗ trợ cả phản hồi dạng luồng và không dạng luồng. Hữu ích khi gỡ lỗi nhưng làm tăng kích thước nhật ký.",
+    "Request Body": "Nội dung yêu cầu",
+    "Response Body": "Nội dung phản hồi",
+    "Model Output": "Đầu ra mô hình",
+    "User Input": "Nội dung người dùng nhập",
     "Recursion Strategy": "Chiến lược đệ quy",
     "Recursive": "Đệ quy",
     "Redeem": "Đổi",
@@ -5103,6 +5111,12 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Request log size limit (KB)": "Giới hạn kích thước nhật ký yêu cầu (KB)",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Các yêu cầu vượt quá giới hạn này sẽ không được ghi lại. Phạm vi cho phép là từ 1 đến 10240 KB.",
+    "Response log size limit (KB)": "Giới hạn kích thước nhật ký phản hồi (KB)",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Các phản hồi vượt quá giới hạn này sẽ không được ghi lại. Phạm vi cho phép là từ 1 đến 10240 KB.",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "Chỉ lưu văn bản do mô hình tạo trong mỗi nhật ký sử dụng (chỉ quản trị viên). Lệnh gọi công cụ, siêu dữ liệu suy luận, dữ liệu sử dụng và các trường phản hồi khác đều bị loại trừ.",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "Chỉ lưu văn bản do người dùng nhập trong mỗi nhật ký sử dụng (chỉ quản trị viên). Tin nhắn hệ thống, tin nhắn trợ lý, lệnh gọi công cụ, tệp và các trường yêu cầu khác đều bị loại trừ."
   }
 }

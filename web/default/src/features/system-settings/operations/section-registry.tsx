@@ -99,7 +99,9 @@ const OPERATIONS_SECTIONS = [
       <LogSettingsSection
         defaultEnabled={Boolean(settings.LogConsumeEnabled)}
         defaultRequestBodyEnabled={Boolean(settings.LogRequestBodyEnabled)}
+        defaultRequestBodyMaxKB={settings.LogRequestBodyMaxKB}
         defaultResponseBodyEnabled={Boolean(settings.LogResponseBodyEnabled)}
+        defaultResponseBodyMaxKB={settings.LogResponseBodyMaxKB}
       />
     ),
   },

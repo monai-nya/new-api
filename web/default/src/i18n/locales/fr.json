@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "Il est recommandé de maintenir cette valeur élevée pour éviter la limitation en amont.",
     "Record IP Address": "Enregistrer l'adresse IP",
     "Record quota usage": "Enregistrer l'utilisation du quota",
+    "Record request body": "Enregistrer le corps de la requête",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "Enregistre le corps original de la requête cliente dans chaque journal d'utilisation (administrateurs uniquement). Utile pour le débogage, mais augmente la taille des journaux et peut stocker du contenu privé.",
+    "Record response body": "Enregistrer le corps de la réponse",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "Enregistre le corps de la réponse du modèle dans chaque journal d'utilisation (administrateurs uniquement). Couvre les réponses en streaming et non-streaming. Utile pour le débogage, mais augmente la taille des journaux.",
+    "Request Body": "Corps de la requête",
+    "Response Body": "Corps de la réponse",
+    "Model Output": "Sortie du modèle",
+    "User Input": "Entrée utilisateur",
     "Recursion Strategy": "Stratégie de récursion",
     "Recursive": "Récursif",
     "Redeem": "Utiliser",
@@ -5103,6 +5111,12 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Request log size limit (KB)": "Limite de taille du journal des requêtes (KB)",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Les requêtes dépassant cette limite ne sont pas enregistrées. La plage autorisée va de 1 à 10240 KB.",
+    "Response log size limit (KB)": "Limite de taille du journal des réponses (KB)",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "Les réponses dépassant cette limite ne sont pas enregistrées. La plage autorisée va de 1 à 10240 KB.",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "Enregistre uniquement le texte généré par le modèle dans chaque journal d'utilisation (administrateurs uniquement). Les appels d'outils, les métadonnées de raisonnement, les données d'utilisation et les autres champs de réponse sont exclus.",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "Enregistre uniquement le texte saisi par l'utilisateur dans chaque journal d'utilisation (administrateurs uniquement). Les messages système et assistant, les appels d'outils, les fichiers et les autres champs de requête sont exclus."
   }
 }

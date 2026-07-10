@@ -116,20 +116,25 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
-// LogRequestBodyEnabled controls whether the original client request body is
-// captured into usage log entries (under other.admin_info.request_body, which
-// is admin-only — formatUserLogs strips admin_info for non-admin viewers).
-// Off by default: request bodies can be large and may contain private
-// conversation content. There is no size cap — the full body is stored, so
-// large payloads (e.g. base64 images) will bloat the log table.
-var LogRequestBodyEnabled bool
+const (
+	DefaultLogRequestBodyMaxKB  = 64
+	DefaultLogResponseBodyMaxKB = 256
+	MaxLogBodySizeKB            = 10 * 1024
+)
 
-// LogResponseBodyEnabled controls whether the model's response body is captured
-// into usage log entries (under other.admin_info.response_body). Like
-// request_body it is admin-only. Captured via a tee ResponseWriter, so it
-// covers both streamed SSE and non-streamed JSON responses. Off by default:
-// response bodies can be large.
+// LogRequestBodyEnabled controls whether user input is captured into usage
+// log entries under other.admin_info.request_body.
+var LogRequestBodyEnabled bool
+var LogRequestBodyMaxKB = DefaultLogRequestBodyMaxKB
+
+// LogResponseBodyEnabled controls whether model output is captured into usage
+// log entries under other.admin_info.response_body.
 var LogResponseBodyEnabled bool
+var LogResponseBodyMaxKB = DefaultLogResponseBodyMaxKB
+
+func IsValidLogBodySizeKB(value int) bool {
+	return value >= 1 && value <= MaxLogBodySizeKB
+}
 
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}

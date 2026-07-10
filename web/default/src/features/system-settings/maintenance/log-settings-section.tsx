@@ -42,6 +42,7 @@ import {
   FormControl,
   FormDescription,
   FormField,
+  FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
@@ -81,7 +82,9 @@ import type { LogCleanupTask } from '../types'
 const logSettingsSchema = z.object({
   LogConsumeEnabled: z.boolean(),
   LogRequestBodyEnabled: z.boolean(),
+  LogRequestBodyMaxKB: z.coerce.number().int().min(1).max(10240),
   LogResponseBodyEnabled: z.boolean(),
+  LogResponseBodyMaxKB: z.coerce.number().int().min(1).max(10240),
 })
 
 type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
@@ -89,7 +92,9 @@ type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
 type LogSettingsSectionProps = {
   defaultEnabled: boolean
   defaultRequestBodyEnabled: boolean
+  defaultRequestBodyMaxKB: number
   defaultResponseBodyEnabled: boolean
+  defaultResponseBodyMaxKB: number
 }
 
 type ServerLogInfo = {
@@ -146,7 +151,9 @@ function isActiveLogCleanupTask(task: LogCleanupTask | null) {
 export function LogSettingsSection({
   defaultEnabled,
   defaultRequestBodyEnabled,
+  defaultRequestBodyMaxKB,
   defaultResponseBodyEnabled,
+  defaultResponseBodyMaxKB,
 }: LogSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -155,7 +162,9 @@ export function LogSettingsSection({
     defaultValues: {
       LogConsumeEnabled: defaultEnabled,
       LogRequestBodyEnabled: defaultRequestBodyEnabled,
+      LogRequestBodyMaxKB: defaultRequestBodyMaxKB,
       LogResponseBodyEnabled: defaultResponseBodyEnabled,
+      LogResponseBodyMaxKB: defaultResponseBodyMaxKB,
     },
   })
 
@@ -185,9 +194,18 @@ export function LogSettingsSection({
     form.reset({
       LogConsumeEnabled: defaultEnabled,
       LogRequestBodyEnabled: defaultRequestBodyEnabled,
+      LogRequestBodyMaxKB: defaultRequestBodyMaxKB,
       LogResponseBodyEnabled: defaultResponseBodyEnabled,
+      LogResponseBodyMaxKB: defaultResponseBodyMaxKB,
     })
-  }, [defaultEnabled, defaultRequestBodyEnabled, defaultResponseBodyEnabled, form])
+  }, [
+    defaultEnabled,
+    defaultRequestBodyEnabled,
+    defaultRequestBodyMaxKB,
+    defaultResponseBodyEnabled,
+    defaultResponseBodyMaxKB,
+    form,
+  ])
 
   useEffect(() => {
     fetchServerLogInfo()
@@ -279,10 +297,22 @@ export function LogSettingsSection({
         value: values.LogRequestBodyEnabled,
       })
     }
+    if (values.LogRequestBodyMaxKB !== defaultRequestBodyMaxKB) {
+      updates.push({
+        key: 'LogRequestBodyMaxKB',
+        value: values.LogRequestBodyMaxKB,
+      })
+    }
     if (values.LogResponseBodyEnabled !== defaultResponseBodyEnabled) {
       updates.push({
         key: 'LogResponseBodyEnabled',
         value: values.LogResponseBodyEnabled,
+      })
+    }
+    if (values.LogResponseBodyMaxKB !== defaultResponseBodyMaxKB) {
+      updates.push({
+        key: 'LogResponseBodyMaxKB',
+        value: values.LogResponseBodyMaxKB,
       })
     }
     for (const update of updates) {
@@ -402,7 +432,7 @@ export function LogSettingsSection({
                   <FormLabel>{t('Record request body')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.'
+                      'Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -419,6 +449,37 @@ export function LogSettingsSection({
 
           <FormField
             control={form.control}
+            name='LogRequestBodyMaxKB'
+            render={({ field }) => (
+              <FormItem
+                data-settings-form-span='full'
+                className='bg-muted/20 rounded-xl border px-3 py-2.5'
+              >
+                <div className='space-y-1'>
+                  <FormLabel>{t('Request log size limit (KB)')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.'
+                    )}
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={10240}
+                    step={1}
+                    className='max-w-40'
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name='LogResponseBodyEnabled'
             render={({ field }) => (
               <SettingsSwitchItem>
@@ -426,7 +487,7 @@ export function LogSettingsSection({
                   <FormLabel>{t('Record response body')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.'
+                      'Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -438,6 +499,37 @@ export function LogSettingsSection({
                 </FormControl>
                 <FormMessage />
               </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='LogResponseBodyMaxKB'
+            render={({ field }) => (
+              <FormItem
+                data-settings-form-span='full'
+                className='bg-muted/20 rounded-xl border px-3 py-2.5'
+              >
+                <div className='space-y-1'>
+                  <FormLabel>{t('Response log size limit (KB)')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.'
+                    )}
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={10240}
+                    step={1}
+                    className='max-w-40'
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )}
           />
 

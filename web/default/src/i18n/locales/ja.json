@@ -3587,6 +3587,14 @@
     "Recommended to keep this high to avoid upstream throttling.": "アップストリームのスロットリングを避けるため、これを高く保つことを推奨します。",
     "Record IP Address": "IPアドレスを記録",
     "Record quota usage": "クォータ使用量を記録",
+    "Record request body": "リクエスト本文を記録",
+    "Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.": "元のクライアントリクエスト本文を各利用ログに記録します（管理者のみ）。デバッグに役立ちますが、ログサイズが増え、個人情報が保存される可能性があります。",
+    "Record response body": "レスポンス本文を記録",
+    "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "モデルのレスポンス本文を各利用ログに記録します（管理者のみ）。ストリーミングと非ストリーミングの両方に対応します。デバッグに役立ちますが、ログサイズが増えます。",
+    "Request Body": "リクエスト本文",
+    "Response Body": "レスポンス本文",
+    "Model Output": "モデル出力",
+    "User Input": "ユーザー入力",
     "Recursion Strategy": "再帰戦略",
     "Recursive": "再帰",
     "Redeem": "引き換え",
@@ -5103,6 +5111,12 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Request log size limit (KB)": "リクエストログのサイズ上限（KB）",
+    "Requests larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "この上限を超えるリクエストは記録されません。設定可能な範囲は 1～10240 KB です。",
+    "Response log size limit (KB)": "レスポンスログのサイズ上限（KB）",
+    "Responses larger than this limit are not recorded. The allowed range is 1 to 10240 KB.": "この上限を超えるレスポンスは記録されません。設定可能な範囲は 1～10240 KB です。",
+    "Store only model-generated text in each usage log entry (admin-only). Tool calls, reasoning metadata, usage data, and other response fields are excluded.": "各利用ログにはモデルが生成したテキストのみを保存します（管理者のみ）。ツール呼び出し、推論メタデータ、使用量データ、その他のレスポンス項目は除外されます。",
+    "Store only user-entered text in each usage log entry (admin-only). System messages, assistant messages, tool calls, files, and other request fields are excluded.": "各利用ログにはユーザーが入力したテキストのみを保存します（管理者のみ）。システムメッセージ、アシスタントメッセージ、ツール呼び出し、ファイル、その他のリクエスト項目は除外されます。"
   }
 }
