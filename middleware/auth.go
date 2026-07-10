@@ -34,14 +34,60 @@ func validUserInfo(username string, role int) bool {
 	return true
 }
 
+func abortInvalidSession(c *gin.Context, session sessions.Session, reason string) {
+	session.Clear()
+	if err := session.Save(); err != nil {
+		common.SysLog(reason + ": " + err.Error())
+	}
+	c.JSON(http.StatusUnauthorized, gin.H{
+		"success": false,
+		"message": common.TranslateMessage(c, i18n.MsgAuthNotLoggedIn),
+	})
+	c.Abort()
+}
+
 func authHelper(c *gin.Context, minRole int) {
 	session := sessions.Default(c)
-	username := session.Get("username")
-	role := session.Get("role")
-	id := session.Get("id")
-	status := session.Get("status")
+	username, hasSession := session.Get("username").(string)
+	var role int
+	var id int
+	var status int
+	var group string
 	useAccessToken := false
-	if username == nil {
+	if hasSession {
+		var idOk bool
+		id, idOk = session.Get("id").(int)
+		sessionVersion, versionOk := session.Get("session_version").(int64)
+		if !idOk || !versionOk {
+			abortInvalidSession(c, session, "failed to clear invalid session")
+			return
+		}
+
+		currentUser, authErr := model.GetUserAuthState(id)
+		if authErr != nil {
+			if errors.Is(authErr, gorm.ErrRecordNotFound) {
+				abortInvalidSession(c, session, "failed to clear deleted user session")
+			} else {
+				common.SysLog("GetUserAuthState database error: " + authErr.Error())
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+				})
+				c.Abort()
+			}
+			return
+		}
+		if currentUser.SessionVersion != sessionVersion {
+			abortInvalidSession(c, session, "failed to clear revoked session")
+			return
+		}
+
+		username = currentUser.Username
+		role = currentUser.Role
+		id = currentUser.Id
+		status = currentUser.Status
+		group = currentUser.Group
+	} else {
 		// Check access token
 		accessToken := c.Request.Header.Get("Authorization")
 		if accessToken == "" {
@@ -83,6 +129,7 @@ func authHelper(c *gin.Context, minRole int) {
 			role = user.Role
 			id = user.Id
 			status = user.Status
+			group = user.Group
 			useAccessToken = true
 		} else {
 			c.JSON(http.StatusOK, gin.H{
@@ -121,7 +168,7 @@ func authHelper(c *gin.Context, minRole int) {
 		c.Abort()
 		return
 	}
-	if status.(int) == common.UserStatusDisabled {
+	if status == common.UserStatusDisabled {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
@@ -129,7 +176,7 @@ func authHelper(c *gin.Context, minRole int) {
 		c.Abort()
 		return
 	}
-	if role.(int) < minRole {
+	if role < minRole {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": common.TranslateMessage(c, i18n.MsgAuthInsufficientPrivilege),
@@ -137,7 +184,7 @@ func authHelper(c *gin.Context, minRole int) {
 		c.Abort()
 		return
 	}
-	if !validUserInfo(username.(string), role.(int)) {
+	if !validUserInfo(username, role) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": common.TranslateMessage(c, i18n.MsgAuthUserInfoInvalid),
@@ -150,8 +197,8 @@ func authHelper(c *gin.Context, minRole int) {
 	c.Set("username", username)
 	c.Set("role", role)
 	c.Set("id", id)
-	c.Set("group", session.Get("group"))
-	c.Set("user_group", session.Get("group"))
+	c.Set("group", group)
+	c.Set("user_group", group)
 	c.Set("use_access_token", useAccessToken)
 
 	// 管理/root 写操作审计兜底：内聚在鉴权链路里，保证任何经过 AdminAuth/RootAuth

@@ -214,7 +214,52 @@ func TestResetUserPasswordByEmailRequiresSingleActiveMatch(t *testing.T) {
 	var unique User
 	require.NoError(t, DB.Where("username = ?", "unique").First(&unique).Error)
 	assert.True(t, common.ValidatePasswordAndHash("NewPassword123", unique.Password))
+	assert.EqualValues(t, 1, unique.SessionVersion)
 
 	err = ResetUserPasswordByEmail("missing@example.com", "NewPassword123")
 	require.True(t, errors.Is(err, ErrEmailNotFound))
+}
+
+func TestUserUpdateRevokesSessionsWhenAuthorizationChanges(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	user := User{
+		Username:       "session-user",
+		Password:       "password",
+		Role:           common.RoleAdminUser,
+		Status:         common.UserStatusEnabled,
+		SessionVersion: 4,
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	user.Role = common.RoleCommonUser
+	require.NoError(t, user.Update(false))
+	assert.EqualValues(t, 5, user.SessionVersion)
+
+	user.DisplayName = "no-auth-change"
+	require.NoError(t, user.Update(false))
+	assert.EqualValues(t, 5, user.SessionVersion)
+
+	user.Status = common.UserStatusDisabled
+	require.NoError(t, user.Update(false))
+	assert.EqualValues(t, 6, user.SessionVersion)
+}
+
+func TestUserPasswordUpdateRevokesPreviousSessions(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	user := User{
+		Username:       "password-session-user",
+		Password:       "old-password",
+		Role:           common.RoleCommonUser,
+		Status:         common.UserStatusEnabled,
+		SessionVersion: 2,
+	}
+	require.NoError(t, DB.Create(&user).Error)
+
+	user.Password = "NewPassword123"
+	require.NoError(t, user.Update(true))
+
+	assert.EqualValues(t, 3, user.SessionVersion)
+	assert.True(t, common.ValidatePasswordAndHash("NewPassword123", user.Password))
 }

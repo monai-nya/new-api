@@ -52,6 +52,7 @@ type User struct {
 	StripeCustomer   string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	CreatedAt        int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	SessionVersion   int64                      `json:"-" gorm:"column:session_version;not null;default:0"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
 }
 
@@ -402,6 +403,15 @@ func GetUserById(id int, selectAll bool) (*User, error) {
 	return &user, err
 }
 
+func GetUserAuthState(id int) (*User, error) {
+	if id == 0 {
+		return nil, errors.New("id is empty")
+	}
+	user := User{}
+	err := DB.Select([]string{"id", "username", "role", "status", "group", "session_version"}).First(&user, "id = ?", id).Error
+	return &user, err
+}
+
 func GetUserIdByAffCode(affCode string) (int, error) {
 	if affCode == "" {
 		return 0, errors.New("affCode 为空！")
@@ -664,10 +674,23 @@ func (user *User) UpdateWithTx(tx *gorm.DB, updatePassword bool) error {
 	if err = tx.First(&current, user.Id).Error; err != nil {
 		return err
 	}
-	if err = tx.Model(&current).Omit("quota", "used_quota", "request_count").Updates(newUser).Error; err != nil {
+	if err = tx.Model(&current).Omit("quota", "used_quota", "request_count", "session_version").Updates(newUser).Error; err != nil {
 		return err
 	}
-	return tx.First(user, user.Id).Error
+	updated := User{}
+	if err = tx.First(&updated, user.Id).Error; err != nil {
+		return err
+	}
+	if updatePassword || updated.Role != current.Role || updated.Status != current.Status {
+		if err = tx.Model(&User{}).Where("id = ?", user.Id).UpdateColumn("session_version", gorm.Expr("session_version + ?", 1)).Error; err != nil {
+			return err
+		}
+		if err = tx.First(&updated, user.Id).Error; err != nil {
+			return err
+		}
+	}
+	*user = updated
+	return nil
 }
 
 func (user *User) Edit(updatePassword bool) error {
@@ -703,6 +726,11 @@ func (user *User) EditWithTx(tx *gorm.DB, updatePassword bool) error {
 	}
 	if err = tx.Model(&current).Updates(updates).Error; err != nil {
 		return err
+	}
+	if updatePassword {
+		if err = tx.Model(&User{}).Where("id = ?", user.Id).UpdateColumn("session_version", gorm.Expr("session_version + ?", 1)).Error; err != nil {
+			return err
+		}
 	}
 	return tx.First(user, user.Id).Error
 }
@@ -913,7 +941,10 @@ func ResetUserPasswordByEmail(email string, password string) error {
 	if err != nil {
 		return err
 	}
-	err = DB.Model(&User{}).Where("id = ?", user.Id).Update("password", hashedPassword).Error
+	err = DB.Model(&User{}).Where("id = ?", user.Id).Updates(map[string]interface{}{
+		"password":        hashedPassword,
+		"session_version": gorm.Expr("session_version + ?", 1),
+	}).Error
 	return err
 }
 
