@@ -169,6 +169,9 @@ func main() {
 
 	// Initialize HTTP server
 	server := gin.New()
+	if err := middleware.ConfigureTrustedProxies(server); err != nil {
+		log.Fatalf("failed to configure trusted proxies: %v", err)
+	}
 	server.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
 		common.SysLog(fmt.Sprintf("panic detected: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{
