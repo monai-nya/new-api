@@ -121,8 +121,11 @@ export interface LogOtherData {
       clamped: number
     }
     // Original client request body, captured when LogRequestBodyEnabled is on.
-    // Admin-only (nested under admin_info). Capped to a few KB.
+    // Admin-only (nested under admin_info). Full body, no size cap.
     request_body?: string
+    // Model response body, captured when LogResponseBodyEnabled is on.
+    // Admin-only (nested under admin_info). Full body, no size cap.
+    response_body?: string
   }
   // Language-independent operation descriptor (audit/login logs).
   // Frontend renders localized content from action + params via i18n templates.

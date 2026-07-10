@@ -310,6 +310,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.LogConsumeEnabled = boolValue
 		case "LogRequestBodyEnabled":
 			common.LogRequestBodyEnabled = boolValue
+		case "LogResponseBodyEnabled":
+			common.LogResponseBodyEnabled = boolValue
 		case "DisplayInCurrencyEnabled":
 			// 兼容旧字段：同步到新配置 general_setting.quota_display_type（运行时生效）
 			// true -> USD, false -> TOKENS

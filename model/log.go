@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -98,27 +99,38 @@ func ensureLogRequestId(log *Log) {
 	}
 }
 
-// attachRequestBodyToOther captures the original client request body into the
-// log's other.admin_info.request_body when LogRequestBodyEnabled is on. It is
-// admin-only (formatUserLogs strips admin_info for non-admin viewers), which
-// keeps potentially private request content out of the user-facing log view.
-// Oversized bodies are skipped rather than truncated, so disk-backed storage is
-// never materialized in full.
-func attachRequestBodyToOther(c *gin.Context, other *map[string]interface{}) {
-	if !common.LogRequestBodyEnabled || c == nil || other == nil {
+// attachBodiesToOther captures the client request body (other.admin_info.
+// request_body) and/or the model response body (other.admin_info.response_body)
+// into the log when the corresponding switches are on. Both are admin-only
+// (formatUserLogs strips admin_info for non-admin viewers). There is no size
+// cap — full bodies are stored, so large payloads will bloat the log table.
+// The response body is captured by the CaptureResponseBody middleware (a tee on
+// c.Writer) and read back from the gin context here.
+func attachBodiesToOther(c *gin.Context, other *map[string]interface{}) {
+	if c == nil || other == nil {
 		return
 	}
-	storage, err := common.GetBodyStorage(c)
-	if err != nil || storage == nil {
+	if !common.LogRequestBodyEnabled && !common.LogResponseBodyEnabled {
 		return
 	}
-	if storage.Size() > int64(common.MaxLogRequestBodyBytes) {
-		return
+	if common.LogRequestBodyEnabled {
+		if storage, err := common.GetBodyStorage(c); err == nil && storage != nil {
+			if body, bErr := storage.Bytes(); bErr == nil && len(body) > 0 {
+				setLogAdminInfo(other, "request_body", string(body))
+			}
+		}
 	}
-	body, err := storage.Bytes()
-	if err != nil || len(body) == 0 {
-		return
+	if common.LogResponseBodyEnabled {
+		if v, ok := c.Get(common.KeyCapturedResponseBody); ok && v != nil {
+			if buf, ok := v.(*bytes.Buffer); ok && buf.Len() > 0 {
+				setLogAdminInfo(other, "response_body", buf.String())
+			}
+		}
 	}
+}
+
+// setLogAdminInfo ensures other.admin_info exists and stores value under key.
+func setLogAdminInfo(other *map[string]interface{}, key string, value string) {
 	if *other == nil {
 		*other = map[string]interface{}{}
 	}
@@ -127,7 +139,7 @@ func attachRequestBodyToOther(c *gin.Context, other *map[string]interface{}) {
 		adminInfo = map[string]interface{}{}
 		(*other)["admin_info"] = adminInfo
 	}
-	adminInfo["request_body"] = string(body)
+	adminInfo[key] = value
 }
 
 func createLog(log *Log) error {
@@ -317,7 +329,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	username := c.GetString("username")
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
-	attachRequestBodyToOther(c, &other)
+	attachBodiesToOther(c, &other)
 	otherStr := common.MapToJsonStr(other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -382,7 +394,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
-	attachRequestBodyToOther(c, &params.Other)
+	attachBodiesToOther(c, &params.Other)
 	otherStr := common.MapToJsonStr(params.Other)
 	// 判断是否需要记录 IP
 	needRecordIp := false

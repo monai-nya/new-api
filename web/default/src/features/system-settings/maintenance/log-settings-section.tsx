@@ -81,6 +81,7 @@ import type { LogCleanupTask } from '../types'
 const logSettingsSchema = z.object({
   LogConsumeEnabled: z.boolean(),
   LogRequestBodyEnabled: z.boolean(),
+  LogResponseBodyEnabled: z.boolean(),
 })
 
 type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
@@ -88,6 +89,7 @@ type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
 type LogSettingsSectionProps = {
   defaultEnabled: boolean
   defaultRequestBodyEnabled: boolean
+  defaultResponseBodyEnabled: boolean
 }
 
 type ServerLogInfo = {
@@ -144,6 +146,7 @@ function isActiveLogCleanupTask(task: LogCleanupTask | null) {
 export function LogSettingsSection({
   defaultEnabled,
   defaultRequestBodyEnabled,
+  defaultResponseBodyEnabled,
 }: LogSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -152,6 +155,7 @@ export function LogSettingsSection({
     defaultValues: {
       LogConsumeEnabled: defaultEnabled,
       LogRequestBodyEnabled: defaultRequestBodyEnabled,
+      LogResponseBodyEnabled: defaultResponseBodyEnabled,
     },
   })
 
@@ -181,8 +185,9 @@ export function LogSettingsSection({
     form.reset({
       LogConsumeEnabled: defaultEnabled,
       LogRequestBodyEnabled: defaultRequestBodyEnabled,
+      LogResponseBodyEnabled: defaultResponseBodyEnabled,
     })
-  }, [defaultEnabled, defaultRequestBodyEnabled, form])
+  }, [defaultEnabled, defaultRequestBodyEnabled, defaultResponseBodyEnabled, form])
 
   useEffect(() => {
     fetchServerLogInfo()
@@ -272,6 +277,12 @@ export function LogSettingsSection({
       updates.push({
         key: 'LogRequestBodyEnabled',
         value: values.LogRequestBodyEnabled,
+      })
+    }
+    if (values.LogResponseBodyEnabled !== defaultResponseBodyEnabled) {
+      updates.push({
+        key: 'LogResponseBodyEnabled',
+        value: values.LogResponseBodyEnabled,
       })
     }
     for (const update of updates) {
@@ -391,7 +402,31 @@ export function LogSettingsSection({
                   <FormLabel>{t('Record request body')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Capture the original client request body into each usage log entry (admin-only, capped to a few KB). Useful for debugging; increases log size and may store private content.'
+                      'Capture the original client request body into each usage log entry (admin-only). Useful for debugging; increases log size and may store private content.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='LogResponseBodyEnabled'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Record response body')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>

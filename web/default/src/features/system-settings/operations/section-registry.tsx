@@ -99,6 +99,7 @@ const OPERATIONS_SECTIONS = [
       <LogSettingsSection
         defaultEnabled={Boolean(settings.LogConsumeEnabled)}
         defaultRequestBodyEnabled={Boolean(settings.LogRequestBodyEnabled)}
+        defaultResponseBodyEnabled={Boolean(settings.LogResponseBodyEnabled)}
       />
     ),
   },
