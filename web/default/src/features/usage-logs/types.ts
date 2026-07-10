@@ -120,11 +120,13 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
-    // Original client request body, captured when LogRequestBodyEnabled is on.
-    // Admin-only (nested under admin_info). Full body, no size cap.
+    // User input text extracted from the request body (conversation messages),
+    // captured when LogRequestBodyEnabled is on. Admin-only (nested under
+    // admin_info). No size cap.
     request_body?: string
-    // Model response body, captured when LogResponseBodyEnabled is on.
-    // Admin-only (nested under admin_info). Full body, no size cap.
+    // Model output text extracted from the response body (streamed or not),
+    // captured when LogResponseBodyEnabled is on. Admin-only (nested under
+    // admin_info). No size cap.
     response_body?: string
   }
   // Language-independent operation descriptor (audit/login logs).

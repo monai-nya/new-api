@@ -99,13 +99,14 @@ func ensureLogRequestId(log *Log) {
 	}
 }
 
-// attachBodiesToOther captures the client request body (other.admin_info.
-// request_body) and/or the model response body (other.admin_info.response_body)
-// into the log when the corresponding switches are on. Both are admin-only
-// (formatUserLogs strips admin_info for non-admin viewers). There is no size
-// cap — full bodies are stored, so large payloads will bloat the log table.
-// The response body is captured by the CaptureResponseBody middleware (a tee on
-// c.Writer) and read back from the gin context here.
+// attachBodiesToOther stores the user input text (other.admin_info.request_body)
+// and/or the model output text (other.admin_info.response_body) into the log
+// when the corresponding switches are on. The request body is parsed into a
+// readable "[role] text" conversation, and the response body (streamed SSE or
+// JSON, captured by the CaptureResponseBody middleware via a tee on c.Writer) is
+// parsed into the model's text output. Both are admin-only (formatUserLogs
+// strips admin_info for non-admin viewers). No size cap, so large payloads will
+// bloat the log table.
 func attachBodiesToOther(c *gin.Context, other *map[string]interface{}) {
 	if c == nil || other == nil {
 		return
@@ -116,14 +117,14 @@ func attachBodiesToOther(c *gin.Context, other *map[string]interface{}) {
 	if common.LogRequestBodyEnabled {
 		if storage, err := common.GetBodyStorage(c); err == nil && storage != nil {
 			if body, bErr := storage.Bytes(); bErr == nil && len(body) > 0 {
-				setLogAdminInfo(other, "request_body", string(body))
+				setLogAdminInfo(other, "request_body", extractRequestText(body))
 			}
 		}
 	}
 	if common.LogResponseBodyEnabled {
 		if v, ok := c.Get(common.KeyCapturedResponseBody); ok && v != nil {
 			if buf, ok := v.(*bytes.Buffer); ok && buf.Len() > 0 {
-				setLogAdminInfo(other, "response_body", buf.String())
+				setLogAdminInfo(other, "response_body", extractResponseText(buf.Bytes()))
 			}
 		}
 	}

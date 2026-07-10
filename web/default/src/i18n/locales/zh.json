@@ -3593,6 +3593,8 @@
     "Capture the model response body into each usage log entry (admin-only). Covers both streamed and non-streamed responses. Useful for debugging; increases log size.": "将模型响应体记录到每条使用日志中（仅管理员可见）。同时覆盖流式与非流式响应。便于调试；会增加日志体积。",
     "Request Body": "请求体",
     "Response Body": "响应体",
+    "Model Output": "模型输出",
+    "User Input": "用户输入",
     "Recursion Strategy": "递归策略",
     "Recursive": "递归",
     "Redeem": "兑换额度",

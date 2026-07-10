@@ -1164,9 +1164,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </DetailSection>
         )}
 
-        {/* Request body (admin only) */}
+        {/* User input (admin only) */}
         {props.isAdmin && other?.admin_info?.request_body && (
-          <DetailSection label={t('Request Body')}>
+          <DetailSection label={t('User Input')}>
             <div className='bg-background/60 relative min-w-0 overflow-hidden rounded border p-2'>
               <Button
                 variant='ghost'
@@ -1191,9 +1191,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </DetailSection>
         )}
 
-        {/* Response body (admin only) */}
+        {/* Model output (admin only) */}
         {props.isAdmin && other?.admin_info?.response_body && (
-          <DetailSection label={t('Response Body')}>
+          <DetailSection label={t('Model Output')}>
             <div className='bg-background/60 relative min-w-0 overflow-hidden rounded border p-2'>
               <Button
                 variant='ghost'
