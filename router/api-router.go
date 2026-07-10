@@ -44,12 +44,12 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.ResetPassword)
 		// OAuth routes - specific routes must come before :provider wildcard
 		apiRouter.GET("/oauth/state", middleware.CriticalRateLimit(), controller.GenerateOAuthCode)
-		apiRouter.POST("/oauth/email/bind", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.EmailBind)
+		apiRouter.POST("/oauth/email/bind", middleware.CriticalRateLimit(), middleware.SessionAuth(), anonymousRequestBodyLimit, controller.EmailBind)
 		// Non-standard OAuth (WeChat, Telegram) - keep original routes
 		apiRouter.GET("/oauth/wechat", middleware.CriticalRateLimit(), controller.WeChatAuth)
-		apiRouter.POST("/oauth/wechat/bind", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.WeChatBind)
+		apiRouter.POST("/oauth/wechat/bind", middleware.CriticalRateLimit(), middleware.SessionAuth(), anonymousRequestBodyLimit, controller.WeChatBind)
 		apiRouter.GET("/oauth/telegram/login", middleware.CriticalRateLimit(), controller.TelegramLogin)
-		apiRouter.GET("/oauth/telegram/bind", middleware.CriticalRateLimit(), controller.TelegramBind)
+		apiRouter.GET("/oauth/telegram/bind", middleware.CriticalRateLimit(), middleware.SessionAuth(), controller.TelegramBind)
 		// Standard OAuth providers (GitHub, Discord, OIDC, LinuxDO) - unified route
 		apiRouter.GET("/oauth/:provider", middleware.CriticalRateLimit(), controller.HandleOAuth)
 		apiRouter.GET("/ratio_config", middleware.CriticalRateLimit(), controller.GetRatioConfig)

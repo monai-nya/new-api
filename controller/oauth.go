@@ -8,6 +8,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
 	"github.com/gin-contrib/sessions"
@@ -18,6 +19,26 @@ import (
 // providerParams returns map with Provider key for i18n templates
 func providerParams(name string) map[string]any {
 	return map[string]any{"Provider": name}
+}
+
+func getOAuthBindingUser(session sessions.Session) (*model.User, error) {
+	authState, err := middleware.ValidateSession(session)
+	if err != nil {
+		return nil, err
+	}
+	if authState.Status != common.UserStatusEnabled ||
+		!common.IsValidateRole(authState.Role) {
+		return nil, middleware.ErrInvalidSession
+	}
+
+	user := &model.User{Id: authState.Id}
+	if err := user.FillUserById(); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, middleware.ErrInvalidSession
+		}
+		return nil, err
+	}
+	return user, nil
 }
 
 // GenerateOAuthCode generates a state code for OAuth CSRF protection
@@ -57,7 +78,8 @@ func HandleOAuth(c *gin.Context) {
 
 	// 1. Validate state (CSRF protection)
 	state := c.Query("state")
-	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {
+	expectedState, stateOK := session.Get("oauth_state").(string)
+	if state == "" || !stateOK || state != expectedState {
 		c.JSON(http.StatusForbidden, gin.H{
 			"success": false,
 			"message": i18n.T(c, i18n.MsgOAuthStateInvalid),
@@ -68,7 +90,23 @@ func HandleOAuth(c *gin.Context) {
 	// 2. Check if user is already logged in (bind flow)
 	username := session.Get("username")
 	if username != nil {
-		handleOAuthBind(c, provider)
+		user, err := getOAuthBindingUser(session)
+		if err != nil {
+			if errors.Is(err, middleware.ErrInvalidSession) {
+				session.Clear()
+				if saveErr := session.Save(); saveErr != nil {
+					common.SysLog("failed to clear invalid OAuth binding session: " + saveErr.Error())
+				}
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"success": false,
+					"message": i18n.T(c, i18n.MsgAuthNotLoggedIn),
+				})
+				return
+			}
+			common.ApiError(c, err)
+			return
+		}
+		handleOAuthBind(c, provider, user)
 		return
 	}
 
@@ -135,7 +173,7 @@ func HandleOAuth(c *gin.Context) {
 }
 
 // handleOAuthBind handles binding OAuth account to existing user
-func handleOAuthBind(c *gin.Context, provider oauth.Provider) {
+func handleOAuthBind(c *gin.Context, provider oauth.Provider, user *model.User) {
 	if !provider.IsEnabled() {
 		common.ApiErrorI18n(c, i18n.MsgOAuthNotEnabled, providerParams(provider.GetName()))
 		return
@@ -169,16 +207,6 @@ func handleOAuthBind(c *gin.Context, provider oauth.Provider) {
 		}
 	}
 
-	// Get current user from session
-	session := sessions.Default(c)
-	id := session.Get("id")
-	user := model.User{Id: id.(int)}
-	err = user.FillUserById()
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-
 	// Handle binding based on provider type
 	if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
 		// Custom provider: use user_oauth_bindings table
@@ -189,7 +217,7 @@ func handleOAuthBind(c *gin.Context, provider oauth.Provider) {
 		}
 	} else {
 		// Built-in provider: update user record directly
-		provider.SetProviderUserID(&user, oauthUser.ProviderUserID)
+		provider.SetProviderUserID(user, oauthUser.ProviderUserID)
 		err = user.Update(false)
 		if err != nil {
 			common.ApiError(c, err)

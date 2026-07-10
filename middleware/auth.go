@@ -34,6 +34,29 @@ func validUserInfo(username string, role int) bool {
 	return true
 }
 
+var ErrInvalidSession = errors.New("invalid session")
+
+func ValidateSession(session sessions.Session) (*model.User, error) {
+	username, usernameOK := session.Get("username").(string)
+	id, idOK := session.Get("id").(int)
+	sessionVersion, versionOK := session.Get("session_version").(int64)
+	if !usernameOK || strings.TrimSpace(username) == "" || !idOK || id == 0 || !versionOK {
+		return nil, ErrInvalidSession
+	}
+
+	currentUser, err := model.GetUserAuthState(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrInvalidSession
+		}
+		return nil, err
+	}
+	if currentUser.SessionVersion != sessionVersion {
+		return nil, ErrInvalidSession
+	}
+	return currentUser, nil
+}
+
 func abortInvalidSession(c *gin.Context, session sessions.Session, reason string) {
 	session.Clear()
 	if err := session.Save(); err != nil {
@@ -55,18 +78,10 @@ func authHelper(c *gin.Context, minRole int) {
 	var group string
 	useAccessToken := false
 	if hasSession {
-		var idOk bool
-		id, idOk = session.Get("id").(int)
-		sessionVersion, versionOk := session.Get("session_version").(int64)
-		if !idOk || !versionOk {
-			abortInvalidSession(c, session, "failed to clear invalid session")
-			return
-		}
-
-		currentUser, authErr := model.GetUserAuthState(id)
+		currentUser, authErr := ValidateSession(session)
 		if authErr != nil {
-			if errors.Is(authErr, gorm.ErrRecordNotFound) {
-				abortInvalidSession(c, session, "failed to clear deleted user session")
+			if errors.Is(authErr, ErrInvalidSession) {
+				abortInvalidSession(c, session, "failed to clear invalid or revoked session")
 			} else {
 				common.SysLog("GetUserAuthState database error: " + authErr.Error())
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -75,10 +90,6 @@ func authHelper(c *gin.Context, minRole int) {
 				})
 				c.Abort()
 			}
-			return
-		}
-		if currentUser.SessionVersion != sessionVersion {
-			abortInvalidSession(c, session, "failed to clear revoked session")
 			return
 		}
 
@@ -228,6 +239,54 @@ func TryUserAuth() func(c *gin.Context) {
 func UserAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		authHelper(c, common.RoleCommonUser)
+	}
+}
+
+// SessionAuth authenticates a current cookie session without requiring the
+// New-Api-User header. It is intended for browser redirects and third-party
+// callbacks that cannot attach custom headers.
+func SessionAuth() func(c *gin.Context) {
+	return func(c *gin.Context) {
+		session := sessions.Default(c)
+		user, err := ValidateSession(session)
+		if err != nil {
+			if errors.Is(err, ErrInvalidSession) {
+				abortInvalidSession(c, session, "failed to clear invalid callback session")
+			} else {
+				common.SysLog("GetUserAuthState database error: " + err.Error())
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"message": common.TranslateMessage(c, i18n.MsgDatabaseError),
+				})
+				c.Abort()
+			}
+			return
+		}
+		if user.Status != common.UserStatusEnabled {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgAuthUserBanned),
+			})
+			c.Abort()
+			return
+		}
+		if !validUserInfo(user.Username, user.Role) || user.Role < common.RoleCommonUser {
+			c.JSON(http.StatusForbidden, gin.H{
+				"success": false,
+				"message": common.TranslateMessage(c, i18n.MsgAuthInsufficientPrivilege),
+			})
+			c.Abort()
+			return
+		}
+
+		c.Header("Auth-Version", "864b7076dbcd0a3c01b5520316720ebf")
+		c.Set("username", user.Username)
+		c.Set("role", user.Role)
+		c.Set("id", user.Id)
+		c.Set("group", user.Group)
+		c.Set("user_group", user.Group)
+		c.Set("use_access_token", false)
+		c.Next()
 	}
 }
 

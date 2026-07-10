@@ -127,3 +127,68 @@ func TestUserAuthRejectsRevokedSessionVersion(t *testing.T) {
 	assert.False(t, called)
 	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
 }
+
+func TestSessionAuthAllowsCurrentCallbackSessionWithoutUserHeader(t *testing.T) {
+	setupAuthSessionTest(t)
+
+	user := model.User{
+		Username:       "callback-session",
+		Password:       "password",
+		Role:           common.RoleCommonUser,
+		Status:         common.UserStatusEnabled,
+		Group:          "default",
+		SessionVersion: 5,
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+	sessionCookie := makeSessionCookie(t, user, user.Role, user.SessionVersion)
+
+	store := cookie.NewStore([]byte("0123456789abcdef0123456789abcdef"))
+	router := gin.New()
+	router.Use(sessions.Sessions("session", store))
+	called := false
+	router.GET("/callback", SessionAuth(), func(c *gin.Context) {
+		called = true
+		assert.Equal(t, user.Id, c.GetInt("id"))
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/callback", nil)
+	request.AddCookie(sessionCookie)
+	router.ServeHTTP(recorder, request)
+
+	assert.True(t, called)
+	assert.Equal(t, http.StatusNoContent, recorder.Code)
+}
+
+func TestSessionAuthRejectsRevokedCallbackSession(t *testing.T) {
+	setupAuthSessionTest(t)
+
+	user := model.User{
+		Username:       "revoked-callback-session",
+		Password:       "password",
+		Role:           common.RoleCommonUser,
+		Status:         common.UserStatusEnabled,
+		Group:          "default",
+		SessionVersion: 8,
+	}
+	require.NoError(t, model.DB.Create(&user).Error)
+	sessionCookie := makeSessionCookie(t, user, user.Role, user.SessionVersion-1)
+
+	store := cookie.NewStore([]byte("0123456789abcdef0123456789abcdef"))
+	router := gin.New()
+	router.Use(sessions.Sessions("session", store))
+	called := false
+	router.GET("/callback", SessionAuth(), func(c *gin.Context) {
+		called = true
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/callback", nil)
+	request.AddCookie(sessionCookie)
+	router.ServeHTTP(recorder, request)
+
+	assert.False(t, called)
+	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
