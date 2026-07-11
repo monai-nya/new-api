@@ -277,25 +277,43 @@ func updateSunoTasks(ctx context.Context, channelId int, taskIds []string, taskM
 			continue
 		}
 
-		task.Status = lo.If(model.TaskStatus(responseItem.Status) != "", model.TaskStatus(responseItem.Status)).Else(task.Status)
-		task.FailReason = lo.If(responseItem.FailReason != "", responseItem.FailReason).Else(task.FailReason)
-		task.SubmitTime = lo.If(responseItem.SubmitTime != 0, responseItem.SubmitTime).Else(task.SubmitTime)
-		task.StartTime = lo.If(responseItem.StartTime != 0, responseItem.StartTime).Else(task.StartTime)
-		task.FinishTime = lo.If(responseItem.FinishTime != 0, responseItem.FinishTime).Else(task.FinishTime)
-		if responseItem.FailReason != "" || task.Status == model.TaskStatusFailure {
-			logger.LogInfo(ctx, task.TaskID+" 构建失败，"+task.FailReason)
-			task.Progress = "100%"
-			RefundTaskQuota(ctx, task, task.FailReason)
-		}
-		if responseItem.Status == model.TaskStatusSuccess {
-			task.Progress = "100%"
-		}
-		task.Data = responseItem.Data
-
-		err = task.Update()
-		if err != nil {
+		if err = applySunoTaskResponse(ctx, task, responseItem); err != nil {
 			common.SysLog("UpdateSunoTask task error: " + err.Error())
 		}
+	}
+	return nil
+}
+
+func applySunoTaskResponse(ctx context.Context, task *model.Task, responseItem dto.SunoDataResponse) error {
+	oldStatus := task.Status
+	task.Status = lo.If(model.TaskStatus(responseItem.Status) != "", model.TaskStatus(responseItem.Status)).Else(task.Status)
+	task.FailReason = lo.If(responseItem.FailReason != "", responseItem.FailReason).Else(task.FailReason)
+	task.SubmitTime = lo.If(responseItem.SubmitTime != 0, responseItem.SubmitTime).Else(task.SubmitTime)
+	task.StartTime = lo.If(responseItem.StartTime != 0, responseItem.StartTime).Else(task.StartTime)
+	task.FinishTime = lo.If(responseItem.FinishTime != 0, responseItem.FinishTime).Else(task.FinishTime)
+
+	shouldRefund := false
+	if responseItem.FailReason != "" || task.Status == model.TaskStatusFailure {
+		task.Status = model.TaskStatusFailure
+		logger.LogInfo(ctx, task.TaskID+" 构建失败，"+task.FailReason)
+		task.Progress = "100%"
+		shouldRefund = oldStatus != model.TaskStatusFailure && oldStatus != model.TaskStatusSuccess
+	}
+	if model.TaskStatus(responseItem.Status) == model.TaskStatusSuccess {
+		task.Progress = "100%"
+	}
+	task.Data = responseItem.Data
+
+	won, err := task.UpdateWithStatus(oldStatus)
+	if err != nil {
+		return err
+	}
+	if !won {
+		logger.LogWarn(ctx, fmt.Sprintf("Suno task %s already transitioned by another process, skip billing", task.TaskID))
+		return nil
+	}
+	if shouldRefund {
+		RefundTaskQuota(ctx, task, task.FailReason)
 	}
 	return nil
 }

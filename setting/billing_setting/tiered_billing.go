@@ -78,6 +78,14 @@ func smokeTestExpr(exprStr string) error {
 	vectors := []billingexpr.TokenParams{
 		{P: 0, C: 0, Len: 0},
 		{P: 1000, C: 1000, Len: 1000},
+		{CR: 1000, Len: 1000},
+		{CC: 1000, Len: 1000},
+		{CC1h: 1000, Len: 1000},
+		{Img: 1000, Len: 1000},
+		{ImgO: 1000, Len: 1000},
+		{AI: 1000, Len: 1000},
+		{AO: 1000, Len: 1000},
+		{P: 1000, C: 1000, Len: 8000, CR: 1000, CC: 1000, CC1h: 1000, Img: 1000, ImgO: 1000, AI: 1000, AO: 1000},
 		{P: 100000, C: 100000, Len: 100000},
 		{P: 1000000, C: 1000000, Len: 1000000},
 	}

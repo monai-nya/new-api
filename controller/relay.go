@@ -573,8 +573,21 @@ func RelayTask(c *gin.Context) {
 
 	// ── 成功：结算 + 日志 + 插入任务 ──
 	if taskErr == nil {
-		if settleErr := service.SettleBilling(c, relayInfo, result.Quota); settleErr != nil {
+		settleErr := service.SettleBilling(c, relayInfo, result.Quota)
+		fundingChargedQuota := result.Quota
+		tokenChargedQuota := result.Quota
+		if relayInfo.Billing != nil {
+			fundingChargedQuota, tokenChargedQuota = relayInfo.Billing.GetChargedQuotas()
+		} else if settleErr != nil {
+			fundingChargedQuota = relayInfo.FinalPreConsumedQuota
+			tokenChargedQuota = relayInfo.FinalPreConsumedQuota
+		}
+		if relayInfo.IsPlayground {
+			tokenChargedQuota = 0
+		}
+		if settleErr != nil {
 			common.SysError("settle task billing error: " + settleErr.Error())
+			relayInfo.PriceData.Quota = fundingChargedQuota
 		}
 		service.LogTaskConsumption(c, relayInfo)
 
@@ -583,6 +596,8 @@ func RelayTask(c *gin.Context) {
 		task.PrivateData.BillingSource = relayInfo.BillingSource
 		task.PrivateData.SubscriptionId = relayInfo.SubscriptionId
 		task.PrivateData.TokenId = relayInfo.TokenId
+		task.PrivateData.FundingChargedQuota = common.GetPointer(fundingChargedQuota)
+		task.PrivateData.TokenChargedQuota = common.GetPointer(tokenChargedQuota)
 		task.PrivateData.NodeName = common.NodeName
 		task.PrivateData.BillingContext = &model.TaskBillingContext{
 			ModelPrice:      relayInfo.PriceData.ModelPrice,
@@ -592,7 +607,7 @@ func RelayTask(c *gin.Context) {
 			OriginModelName: relayInfo.OriginModelName,
 			PerCallBilling:  common.StringsContains(constant.TaskPricePatches, relayInfo.OriginModelName) || relayInfo.PriceData.UsePrice,
 		}
-		task.Quota = result.Quota
+		task.Quota = fundingChargedQuota
 		task.Data = result.TaskData
 		task.Action = relayInfo.Action
 		if insertErr := task.Insert(); insertErr != nil {

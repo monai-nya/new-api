@@ -383,19 +383,20 @@ func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
+	if err = increaseTokenQuota(tokenId, quota); err != nil {
+		return err
+	}
 	if common.RedisEnabled {
 		gopool.Go(func() {
-			err := cacheIncrTokenQuota(key, int64(quota))
-			if err != nil {
-				common.SysLog("failed to increase token quota: " + err.Error())
+			if cacheErr := cacheIncrTokenQuota(key, int64(quota)); cacheErr != nil {
+				common.SysLog("failed to increase token quota cache: " + cacheErr.Error())
+				if deleteErr := cacheDeleteToken(key); deleteErr != nil {
+					common.SysLog("failed to invalidate token quota cache: " + deleteErr.Error())
+				}
 			}
 		})
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, quota)
-		return nil
-	}
-	return increaseTokenQuota(tokenId, quota)
+	return nil
 }
 
 func increaseTokenQuota(id int, quota int) (err error) {
@@ -413,19 +414,20 @@ func DecreaseTokenQuota(id int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
+	if err = decreaseTokenQuota(id, quota); err != nil {
+		return err
+	}
 	if common.RedisEnabled {
 		gopool.Go(func() {
-			err := cacheDecrTokenQuota(key, int64(quota))
-			if err != nil {
-				common.SysLog("failed to decrease token quota: " + err.Error())
+			if cacheErr := cacheDecrTokenQuota(key, int64(quota)); cacheErr != nil {
+				common.SysLog("failed to decrease token quota cache: " + cacheErr.Error())
+				if deleteErr := cacheDeleteToken(key); deleteErr != nil {
+					common.SysLog("failed to invalidate token quota cache: " + deleteErr.Error())
+				}
 			}
 		})
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
-		return nil
-	}
-	return decreaseTokenQuota(id, quota)
+	return nil
 }
 
 func decreaseTokenQuota(id int, quota int) (err error) {
